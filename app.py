@@ -1,356 +1,154 @@
+
 import streamlit as st
 import pandas as pd
 import math
 
-# ==========================================
-# CONFIGURACIÓN
-# ==========================================
+st.set_page_config(page_title="Simulador Mundial 2026", page_icon="⚽", layout="wide")
 
-st.set_page_config(
-    page_title="Simulador Mundial 2026",
-    page_icon="⚽",
-    layout="wide"
-)
-
-# ==========================================
-# CLASIFICADOS MUNDIAL 2026
-# (actualizar según FIFA)
-# ==========================================
-
-WORLD_CUP_2026_TEAMS = [
-    "Argentina",
-    "Australia",
-    "Brasil",
-    "Canadá",
-    "Colombia",
-    "Corea del Sur",
-    "Ecuador",
-    "España",
-    "Estados Unidos",
-    "Francia",
-    "Inglaterra",
-    "Japón",
-    "México",
-    "Marruecos",
-    "Portugal",
-    "Uruguay"
-]
-
-# ==========================================
-# DATOS MOCK
-# REEMPLAZAR POR APIs
-# ==========================================
-
-TEAM_DATA = {
-
-    "Argentina": {
-        "elo": 2145,
-        "xg": 2.15,
-        "valor": 890,
-        "forma": 92,
-        "confederacion": "CONMEBOL",
-        "h2h": 70
-    },
-
-    "Brasil": {
-        "elo": 2100,
-        "xg": 2.05,
-        "valor": 1180,
-        "forma": 88,
-        "confederacion": "CONMEBOL",
-        "h2h": 65
-    },
-
-    "Colombia": {
-        "elo": 1935,
-        "xg": 1.75,
-        "valor": 360,
-        "forma": 85,
-        "confederacion": "CONMEBOL",
-        "h2h": 55
-    },
-
-    "España": {
-        "elo": 2080,
-        "xg": 2.00,
-        "valor": 1250,
-        "forma": 90,
-        "confederacion": "UEFA",
-        "h2h": 60
-    },
-
-    "Francia": {
-        "elo": 2095,
-        "xg": 2.10,
-        "valor": 1320,
-        "forma": 91,
-        "confederacion": "UEFA",
-        "h2h": 62
-    },
-
-    "Inglaterra": {
-        "elo": 2050,
-        "xg": 1.95,
-        "valor": 1400,
-        "forma": 87,
-        "confederacion": "UEFA",
-        "h2h": 58
-    },
-
-    "Portugal": {
-        "elo": 2010,
-        "xg": 1.85,
-        "valor": 980,
-        "forma": 86,
-        "confederacion": "UEFA",
-        "h2h": 55
-    },
-
-    "Uruguay": {
-        "elo": 1980,
-        "xg": 1.90,
-        "valor": 540,
-        "forma": 84,
-        "confederacion": "CONMEBOL",
-        "h2h": 57
-    }
-}
-
-# ==========================================
-# FUNCIONES
-# ==========================================
-
-def probabilidad_poisson(lmbda, goles):
-    return (
-        math.exp(-lmbda)
-        * (lmbda ** goles)
-        / math.factorial(goles)
-    )
-
-
-def obtener_datos_equipo(pais):
-
-    default = {
-        "elo": 1800,
-        "xg": 1.4,
-        "valor": 250,
-        "forma": 70,
-        "confederacion": "UEFA",
-        "h2h": 50
-    }
-
-    return TEAM_DATA.get(pais, default)
-
-
-def score_elo(elo):
-    return min(10, max(1, elo / 220))
-
-
-def score_xg(xg):
-    return min(10, max(1, xg * 4))
-
-
-def score_valor(valor):
-    return min(10, max(1, valor / 140))
-
-
-def score_forma(forma):
-    return forma / 10
-
-
-def score_h2h(valor):
-    return valor / 10
-
-
-def score_localia(confederacion):
-
-    bonus = {
-        "CONCACAF": 9,
-        "CONMEBOL": 7,
-        "UEFA": 5,
-        "CAF": 4,
-        "AFC": 4
-    }
-
-    return bonus.get(confederacion, 5)
-
-
-# ==========================================
-# INTERFAZ
-# ==========================================
-
-st.title("⚽ Simulador Mundial FIFA 2026")
-st.write("Modelo híbrido Elo + xG + Valor + Forma + Localía + Historial")
-
-# ==========================================
-# PESOS
-# ==========================================
-
-st.sidebar.header("Pesos del Modelo")
-
-peso_elo = st.sidebar.slider("Elo", 0, 100, 30)
-peso_xg = st.sidebar.slider("xG", 0, 100, 25)
-peso_valor = st.sidebar.slider("Valor Plantel", 0, 100, 20)
-peso_forma = st.sidebar.slider("Forma", 0, 100, 15)
-peso_localia = st.sidebar.slider("Localía", 0, 100, 5)
-peso_h2h = st.sidebar.slider("Historial", 0, 100, 5)
-
-peso_total = (
-    peso_elo
-    + peso_xg
-    + peso_valor
-    + peso_forma
-    + peso_localia
-    + peso_h2h
-)
-
-# ==========================================
-# SELECCIÓN EQUIPOS
-# ==========================================
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    equipo_a = st.selectbox(
-        "País A",
-        WORLD_CUP_2026_TEAMS
-    )
-
-with col2:
-
-    disponibles = [
-        x for x in WORLD_CUP_2026_TEAMS
-        if x != equipo_a
-    ]
-
-    equipo_b = st.selectbox(
-        "País B",
-        disponibles
-    )
-
-# ==========================================
-# CARGA DATOS
-# ==========================================
-
-a = obtener_datos_equipo(equipo_a)
-b = obtener_datos_equipo(equipo_b)
-
-# ==========================================
-# TABLA COMPARATIVA
-# ==========================================
-
-st.subheader("Comparación de Variables")
-
-df = pd.DataFrame({
-
-    equipo_a: [
-        a["elo"],
-        a["xg"],
-        a["valor"],
-        a["forma"],
-        a["h2h"]
-    ],
-
-    equipo_b: [
-        b["elo"],
-        b["xg"],
-        b["valor"],
-        b["forma"],
-        b["h2h"]
-    ]
-
-},
-index=[
-    "Elo",
-    "xG",
-    "Valor Plantel (€M)",
-    "Forma",
-    "Historial"
+WORLD_CUP_2026_TEAMS = sorted([
+"Argentina","Brasil","Colombia","Ecuador","Paraguay","Uruguay",
+"Alemania","Austria","Bélgica","Bosnia y Herzegovina","Croacia","España",
+"Escocia","Francia","Países Bajos","Noruega","Portugal","República Checa",
+"Suecia","Suiza","Turquía","Inglaterra","Argelia","Cabo Verde",
+"Costa de Marfil","Egipto","Ghana","Marruecos","RD del Congo",
+"Senegal","Sudáfrica","Túnez","Arabia Saudita","Australia","Catar",
+"Corea del Sur","Irak","Irán","Japón","Jordania","Uzbekistán",
+"Canadá","Curazao","Estados Unidos","Haití","México","Panamá","Nueva Zelanda"
 ])
 
-st.dataframe(df, use_container_width=True)
+BASE_WEIGHTS = {
+    "elo": 35,
+    "forma": 25,
+    "goles": 20,
+    "valor": 10,
+    "descanso": 5,
+    "localia": 3,
+    "h2h": 2
+}
 
-# ==========================================
-# CÁLCULO FUERZA
-# ==========================================
+CONF = {
+    "Argentina":"CONMEBOL","Brasil":"CONMEBOL","Colombia":"CONMEBOL","Ecuador":"CONMEBOL","Paraguay":"CONMEBOL","Uruguay":"CONMEBOL",
+    "Alemania":"UEFA","Austria":"UEFA","Bélgica":"UEFA","Bosnia y Herzegovina":"UEFA","Croacia":"UEFA","España":"UEFA",
+    "Escocia":"UEFA","Francia":"UEFA","Países Bajos":"UEFA","Noruega":"UEFA","Portugal":"UEFA","República Checa":"UEFA",
+    "Suecia":"UEFA","Suiza":"UEFA","Turquía":"UEFA","Inglaterra":"UEFA",
+    "Argelia":"CAF","Cabo Verde":"CAF","Costa de Marfil":"CAF","Egipto":"CAF","Ghana":"CAF","Marruecos":"CAF",
+    "RD del Congo":"CAF","Senegal":"CAF","Sudáfrica":"CAF","Túnez":"CAF",
+    "Arabia Saudita":"AFC","Australia":"AFC","Catar":"AFC","Corea del Sur":"AFC","Irak":"AFC","Irán":"AFC",
+    "Japón":"AFC","Jordania":"AFC","Uzbekistán":"AFC",
+    "Canadá":"CONCACAF","Curazao":"CONCACAF","Estados Unidos":"CONCACAF","Haití":"CONCACAF","México":"CONCACAF","Panamá":"CONCACAF",
+    "Nueva Zelanda":"OFC"
+}
 
-if st.button("Calcular Marcador Probable"):
+def poisson(lmbda, goles):
+    return (math.exp(-lmbda) * (lmbda ** goles)) / math.factorial(goles)
 
-    fuerza_a = (
+def fuerza_a_lambda(score):
+    return 0.60 + (score / 10.0) * 2.20
 
-        score_elo(a["elo"]) * peso_elo +
-        score_xg(a["xg"]) * peso_xg +
-        score_valor(a["valor"]) * peso_valor +
-        score_forma(a["forma"]) * peso_forma +
-        score_localia(a["confederacion"]) * peso_localia +
-        score_h2h(a["h2h"]) * peso_h2h
+def recalcular_pesos(disponibles):
+    activos = {k:v for k,v in BASE_WEIGHTS.items() if disponibles.get(k,False)}
+    total = sum(activos.values())
+    return {k:v/total for k,v in activos.items()}
 
-    ) / peso_total
+def mock_data(team):
+    seed = sum(ord(c) for c in team)
+    return {
+        "elo": 1700 + (seed % 500),
+        "forma": 60 + (seed % 40),
+        "gf": 8 + (seed % 18),
+        "gc": 4 + (seed % 12),
+        "valor": 100 + (seed % 1200),
+        "descanso": 3 + (seed % 5),
+        "h2h": 40 + (seed % 40),
+        "conf": CONF.get(team, "UEFA")
+    }
 
-    fuerza_b = (
+def score_team(d, pesos):
+    ataque = min(10, max(1, d["gf"]/2))
+    defensa = min(10, max(1, 10 - d["gc"]/2))
+    goles_score = (ataque + defensa)/2
 
-        score_elo(b["elo"]) * peso_elo +
-        score_xg(b["xg"]) * peso_xg +
-        score_valor(b["valor"]) * peso_valor +
-        score_forma(b["forma"]) * peso_forma +
-        score_localia(b["confederacion"]) * peso_localia +
-        score_h2h(b["h2h"]) * peso_h2h
+    localia_map = {"CONCACAF":9,"CONMEBOL":7,"UEFA":5,"CAF":4,"AFC":4,"OFC":3}
 
-    ) / peso_total
+    valores = {
+        "elo": min(10, d["elo"]/220),
+        "forma": d["forma"]/10,
+        "goles": goles_score,
+        "valor": min(10, d["valor"]/140),
+        "descanso": min(10, d["descanso"]*1.5),
+        "localia": localia_map.get(d["conf"],5),
+        "h2h": d["h2h"]/10
+    }
 
-    marcador = ""
+    return sum(valores[k]*pesos[k] for k in pesos)
+
+st.title("⚽ Simulador Mundial 2026")
+
+a_col,b_col = st.columns(2)
+
+with a_col:
+    equipo_a = st.selectbox("País A", WORLD_CUP_2026_TEAMS)
+
+with b_col:
+    equipo_b = st.selectbox("País B",[x for x in WORLD_CUP_2026_TEAMS if x != equipo_a])
+
+a = mock_data(equipo_a)
+b = mock_data(equipo_b)
+
+st.subheader("Disponibilidad de Variables")
+
+disp = {
+    "elo": True,
+    "forma": True,
+    "goles": True,
+    "valor": True,
+    "descanso": True,
+    "localia": True,
+    "h2h": False
+}
+
+pesos = recalcular_pesos(disp)
+
+st.dataframe(pd.DataFrame({
+    "Variable": list(disp.keys()),
+    "Disponible": ["✅" if v else "❌" for v in disp.values()],
+    "Peso Ajustado (%)": [round(pesos.get(k,0)*100,2) for k in disp.keys()]
+}), use_container_width=True)
+
+comp = pd.DataFrame({
+    equipo_a:[a["elo"],a["forma"],a["gf"],a["gc"],a["valor"]],
+    equipo_b:[b["elo"],b["forma"],b["gf"],b["gc"],b["valor"]]
+}, index=["Elo","Forma","GF(10)","GC(10)","Valor"])
+
+st.subheader("Comparación")
+st.dataframe(comp, use_container_width=True)
+
+if st.button("Calcular Pronóstico"):
+    fuerza_a = score_team(a,pesos)
+    fuerza_b = score_team(b,pesos)
+
+    la = fuerza_a_lambda(fuerza_a)
+    lb = fuerza_a_lambda(fuerza_b)
+
+    mejor = ""
     prob_max = 0
 
-    for goles_a in range(6):
+    for ga in range(8):
+        for gb in range(8):
+            p = poisson(la,ga) * poisson(lb,gb)
+            if p > prob_max:
+                prob_max = p
+                mejor = f"{equipo_a} {ga} - {gb} {equipo_b}"
 
-        for goles_b in range(6):
+    st.success(f"Marcador más probable: {mejor}")
+    st.info(f"Probabilidad: {prob_max*100:.2f}%")
 
-            prob = (
-                probabilidad_poisson(
-                    fuerza_a,
-                    goles_a
-                )
-                *
-                probabilidad_poisson(
-                    fuerza_b,
-                    goles_b
-                )
-            )
+    c1,c2,c3 = st.columns(3)
+    c1.metric("λ Equipo A", round(la,2))
+    c2.metric("λ Equipo B", round(lb,2))
+    c3.metric("Dif. Elo", a["elo"]-b["elo"])
 
-            if prob > prob_max:
-
-                prob_max = prob
-
-                marcador = (
-                    f"{equipo_a} {goles_a}"
-                    f" - "
-                    f"{goles_b} {equipo_b}"
-                )
-
-    st.success(
-        f"Marcador más probable: {marcador}"
-    )
-
-    st.info(
-        f"Probabilidad: {prob_max*100:.2f}%"
-    )
-
-    st.subheader("Indicadores")
-
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric(
-        "Diferencia Elo",
-        a["elo"] - b["elo"]
-    )
-
-    c2.metric(
-        "Diferencia xG",
-        round(a["xg"] - b["xg"], 2)
-    )
-
-    c3.metric(
-        "Valor Plantel (€M)",
-        a["valor"] - b["valor"]
+    st.warning(
+        "Versión preparada para conectar fuentes reales (Elo, resultados, valor de mercado, descanso e historial). "
+        "Actualmente utiliza datos simulados para evitar dependencias externas."
     )
