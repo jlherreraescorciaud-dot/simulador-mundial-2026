@@ -13,7 +13,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚽ Mundial 2026 - Predictor de Marcadores")
+st.title("⚽ Mundial 2026 - Predictor de Marcadores de José Luis y Jean")
 
 # =====================================================
 # CARGA CSV
