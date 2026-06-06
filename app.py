@@ -267,8 +267,8 @@ def confianza(top3):
 
     return "★☆☆☆☆"
 
-st.metric(
-    "Confianza",
+print(
+    "Confianza:",
     confianza(top3)
 )
 
