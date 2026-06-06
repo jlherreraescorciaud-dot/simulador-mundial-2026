@@ -102,29 +102,47 @@ def expected_goals(eq_local, eq_visitante):
         lambda_visitante
     )
 
+def generar_matriz(
+    lambda_local,
+    lambda_visitante
+):
 
-def generar_matriz(lambda_local,
-                   lambda_visitante):
+    matriz = np.zeros((7,7))
 
-    matriz = np.zeros((7, 7))
+    for i in range(7):
 
-    for g_local in range(7):
+        for j in range(7):
 
-        for g_visitante in range(7):
-
-            matriz[g_local, g_visitante] = (
-                poisson.pmf(
-                    g_local,
-                    lambda_local
-                )
-                *
-                poisson.pmf(
-                    g_visitante,
-                    lambda_visitante
-                )
+            p_home = poisson.pmf(
+                i,
+                lambda_local
             )
 
+            p_away = poisson.pmf(
+                j,
+                lambda_visitante
+            )
+
+            tau = dixon_coles_correction(
+                i,
+                j,
+                lambda_local,
+                lambda_visitante,
+                rho=-0.08
+            )
+
+            matriz[i,j] = (
+                p_home
+                *
+                p_away
+                *
+                tau
+            )
+
+    matriz = matriz / matriz.sum()
+
     return matriz
+
 
 
 def probabilidades_1x2(matriz):
@@ -196,6 +214,27 @@ def over25(matriz):
 
     return prob
 
+def dixon_coles_correction(
+    home_goals,
+    away_goals,
+    lambda_home,
+    lambda_away,
+    rho=-0.08
+):
+
+    if home_goals == 0 and away_goals == 0:
+        return 1 - (lambda_home * lambda_away * rho)
+
+    elif home_goals == 0 and away_goals == 1:
+        return 1 + (lambda_home * rho)
+
+    elif home_goals == 1 and away_goals == 0:
+        return 1 + (lambda_away * rho)
+
+    elif home_goals == 1 and away_goals == 1:
+        return 1 - rho
+
+    return 1
 
 def ambos_marcan(matriz):
 
@@ -210,7 +249,28 @@ def ambos_marcan(matriz):
             prob += matriz[i, j]
 
     return prob
+def confianza(top3):
 
+    p = top3[0][1]
+
+    if p > 0.16:
+        return "★★★★★"
+
+    elif p > 0.13:
+        return "★★★★☆"
+
+    elif p > 0.10:
+        return "★★★☆☆"
+
+    elif p > 0.08:
+        return "★★☆☆☆"
+
+    return "★☆☆☆☆"
+
+st.metric(
+    "Confianza",
+    confianza(top3)
+)
 
 # =====================================================
 # BOTÓN
