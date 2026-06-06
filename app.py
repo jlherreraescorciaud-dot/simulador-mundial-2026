@@ -267,22 +267,6 @@ def confianza(top3):
 
     return "★☆☆☆☆"
 
-st.subheader(
-    "🏆 Top 3 Marcadores"
-)
-
-for marcador, prob in top3:
-
-    st.write(
-        f"**{marcador}** → "
-        f"{prob*100:.2f}%"
-    )
-
-st.metric(
-    "confianza",
-    confianza(top3)
-)
-
 # =====================================================
 # BOTÓN
 # =====================================================
@@ -367,19 +351,37 @@ if st.button("Generar Predicción"):
         f"Ambos marcan: "
         f"{ambos_marcan(matriz)*100:.1f}%"
     )
+st.divider()
 
-    st.divider()
+st.subheader(
+    "🏆 Top 3 Marcadores"
+)
 
-    st.subheader(
-        "Goles Esperados"
-    )
-
-    st.write(
-        f"{local}: "
-        f"{lambda_local:.2f}"
-    )
+for marcador, prob in top3:
 
     st.write(
-        f"{visitante}: "
-        f"{lambda_visitante:.2f}"
+        f"**{marcador}** → "
+        f"{prob*100:.2f}%"
     )
+
+st.metric(
+    "Confianza",
+    confianza(top3)
+)
+
+st.divider()
+
+st.subheader(
+    "Mercados Adicionales"
+)
+
+st.write(
+    f"Over 2.5: "
+    f"{over25(matriz)*100:.1f}%"
+)
+
+st.write(
+    f"Ambos marcan: "
+    f"{ambos_marcan(matriz)*100:.1f}%"
+)
+   
