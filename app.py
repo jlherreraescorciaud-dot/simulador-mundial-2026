@@ -8,7 +8,7 @@ from scipy.stats import poisson
 # =====================================================
 
 st.set_page_config(
-    page_title="Mundial 2026 Predictor",
+    page_title="Mundial 2026 Predictor de José Luis y Jean",
     page_icon="⚽",
     layout="wide"
 )
@@ -284,7 +284,7 @@ if st.button("Generar Predicción"):
     st.divider()
 
     st.subheader(
-        "Mercados Adicionales"
+        "Marcadores Adicionales"
     )
 
     st.write(
