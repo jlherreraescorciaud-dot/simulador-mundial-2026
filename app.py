@@ -1,182 +1,314 @@
-
-"""
-app_mundial2026_realdata.py
-
-Versión preparada para datos reales.
-Actualización recomendada:
-- Elo: diaria
-- Resultados/Forma: diaria
-- Valor plantel: semanal
-- H2H: diaria
-"""
-
 import streamlit as st
 import pandas as pd
-import math
-import requests
-from datetime import datetime, timedelta
+import numpy as np
+from scipy.stats import poisson
 
-st.set_page_config(page_title="Mundial 2026 Predictor", layout="wide")
+# =====================================================
+# CONFIGURACIÓN
+# =====================================================
 
-# ======== CONFIG ========
-
-CACHE_HOURS = 24
-
-WORLD_CUP_2026_TEAMS = sorted([
-"Argentina","Brasil","Colombia","Ecuador","Paraguay","Uruguay",
-"Alemania","Austria","Bélgica","Bosnia y Herzegovina","Croacia","España",
-"Escocia","Francia","Países Bajos","Noruega","Portugal","República Checa",
-"Suecia","Suiza","Turquía","Inglaterra","Argelia","Cabo Verde",
-"Costa de Marfil","Egipto","Ghana","Marruecos","RD del Congo",
-"Senegal","Sudáfrica","Túnez","Arabia Saudita","Australia","Catar",
-"Corea del Sur","Irak","Irán","Japón","Jordania","Uzbekistán",
-"Canadá","Curazao","Estados Unidos","Haití","México","Panamá","Nueva Zelanda"
-])
-
-# ====================================================
-# FUNCIONES PARA CONECTAR FUENTES REALES
-# ====================================================
-
-@st.cache_data(ttl=60*60*24)
-def get_team_data(team):
-    """
-    Sustituir aquí por tus fuentes reales.
-
-    Ejemplos recomendados:
-
-    Elo:
-        eloratings.net
-
-    Resultados:
-        football-data.org
-        api-football.com
-
-    Valor:
-        Transfermarkt (dataset propio)
-
-    H2H:
-        api-football
-    """
-
-    # FALLBACK TEMPORAL
-    seed = sum(ord(c) for c in team)
-
-    return {
-        "elo": 1700 + (seed % 500),
-        "forma": 60 + (seed % 40),
-        "gf": 8 + (seed % 18),
-        "gc": 4 + (seed % 12),
-        "valor": 100 + (seed % 1200),
-        "h2h": 40 + (seed % 40)
-    }
-
-def poisson(lmbda, goals):
-    return (math.exp(-lmbda) * (lmbda ** goals)) / math.factorial(goals)
-
-def lambda_from_strength(x):
-    return 0.6 + (x / 10.0) * 2.2
-
-def score(data):
-
-    elo = min(10, data["elo"] / 220)
-    forma = data["forma"] / 10
-    goles = min(10, (data["gf"] / max(1, data["gc"])) * 2)
-    valor = min(10, data["valor"] / 140)
-
-    return (
-        elo * 0.40 +
-        forma * 0.30 +
-        goles * 0.20 +
-        valor * 0.10
-    )
-
-# ====================================================
-
-st.title("⚽ Predictor Mundial 2026")
-
-c1, c2 = st.columns(2)
-
-with c1:
-    team_a = st.selectbox("Selección A", WORLD_CUP_2026_TEAMS)
-
-with c2:
-    team_b = st.selectbox(
-        "Selección B",
-        [x for x in WORLD_CUP_2026_TEAMS if x != team_a]
-    )
-
-a = get_team_data(team_a)
-b = get_team_data(team_b)
-
-st.subheader("Datos utilizados")
-
-st.dataframe(
-    pd.DataFrame({
-        team_a: a,
-        team_b: b
-    })
+st.set_page_config(
+    page_title="Mundial 2026 Predictor",
+    page_icon="⚽",
+    layout="wide"
 )
 
-if st.button("Calcular Pronóstico"):
+st.title("⚽ Mundial 2026 - Predictor de Marcadores")
 
-    sa = score(a)
-    sb = score(b)
+# =====================================================
+# CARGA CSV
+# =====================================================
 
-    la = lambda_from_strength(sa)
-    lb = lambda_from_strength(sb)
-
-    p_win_a = 0
-    p_draw = 0
-    p_win_b = 0
-
-    over25 = 0
-    btts = 0
-
-    rows = []
-
-    for ga in range(8):
-        for gb in range(8):
-
-            p = poisson(la, ga) * poisson(lb, gb)
-
-            rows.append([f"{ga}-{gb}", p])
-
-            if ga > gb:
-                p_win_a += p
-            elif ga == gb:
-                p_draw += p
-            else:
-                p_win_b += p
-
-            if ga + gb > 2:
-                over25 += p
-
-            if ga > 0 and gb > 0:
-                btts += p
-
-    top10 = (
-        pd.DataFrame(rows, columns=["Marcador","Prob"])
-        .sort_values("Prob", ascending=False)
-        .head(10)
+@st.cache_data
+def cargar_datos():
+    return pd.read_csv(
+        "mundial2026_top3_marcadores.csv"
     )
 
-    top10["Prob"] = (top10["Prob"] * 100).round(2)
+df = cargar_datos()
 
-    x1,x2,x3 = st.columns(3)
+# =====================================================
+# SELECTORES
+# =====================================================
 
-    x1.metric(f"Gana {team_a}", f"{p_win_a*100:.1f}%")
-    x2.metric("Empate", f"{p_draw*100:.1f}%")
-    x3.metric(f"Gana {team_b}", f"{p_win_b*100:.1f}%")
+equipos = sorted(df["seleccion"].unique())
 
-    st.subheader("Top 10 Marcadores")
-    st.dataframe(top10, use_container_width=True)
+col1, col2 = st.columns(2)
 
-    y1,y2 = st.columns(2)
+with col1:
+    local = st.selectbox(
+        "Equipo Local",
+        equipos
+    )
 
-    y1.metric("Over 2.5", f"{over25*100:.1f}%")
-    y2.metric("BTTS Sí", f"{btts*100:.1f}%")
+with col2:
+    visitante = st.selectbox(
+        "Equipo Visitante",
+        equipos,
+        index=1
+    )
 
-    st.caption(
-        "Recomendación: programar una actualización automática diaria. "
-        "Valor de plantel puede actualizarse semanalmente."
+# =====================================================
+# FUNCIONES
+# =====================================================
+
+def obtener_equipo(nombre):
+
+    return df[
+        df["seleccion"] == nombre
+    ].iloc[0]
+
+
+def expected_goals(eq_local, eq_visitante):
+
+    lambda_local = (
+        0.65
+        + (eq_local["ataque_rating"] / 100)
+        + (
+            (100 - eq_visitante["defensa_rating"])
+            / 100
+        )
+    )
+
+    lambda_visitante = (
+        0.65
+        + (eq_visitante["ataque_rating"] / 100)
+        + (
+            (100 - eq_local["defensa_rating"])
+            / 100
+        )
+    )
+
+    lambda_local *= (
+        1
+        + eq_local["ventaja_continental"] * 0.08
+    )
+
+    lambda_local *= (
+        1
+        - eq_local["fatiga_score"] * 0.05
+    )
+
+    lambda_visitante *= (
+        1
+        - eq_visitante["fatiga_score"] * 0.05
+    )
+
+    lambda_local = max(0.30, lambda_local)
+    lambda_visitante = max(0.30, lambda_visitante)
+
+    return (
+        lambda_local,
+        lambda_visitante
+    )
+
+
+def generar_matriz(lambda_local,
+                   lambda_visitante):
+
+    matriz = np.zeros((7, 7))
+
+    for g_local in range(7):
+
+        for g_visitante in range(7):
+
+            matriz[g_local, g_visitante] = (
+                poisson.pmf(
+                    g_local,
+                    lambda_local
+                )
+                *
+                poisson.pmf(
+                    g_visitante,
+                    lambda_visitante
+                )
+            )
+
+    return matriz
+
+
+def probabilidades_1x2(matriz):
+
+    local = 0
+    empate = 0
+    visitante = 0
+
+    filas, columnas = matriz.shape
+
+    for i in range(filas):
+
+        for j in range(columnas):
+
+            if i > j:
+                local += matriz[i, j]
+
+            elif i == j:
+                empate += matriz[i, j]
+
+            else:
+                visitante += matriz[i, j]
+
+    return (
+        local,
+        empate,
+        visitante
+    )
+
+
+def top3_scores(matriz):
+
+    resultados = []
+
+    filas, columnas = matriz.shape
+
+    for i in range(filas):
+
+        for j in range(columnas):
+
+            resultados.append(
+                (
+                    f"{i}-{j}",
+                    matriz[i, j]
+                )
+            )
+
+    resultados.sort(
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return resultados[:3]
+
+
+def over25(matriz):
+
+    prob = 0
+
+    filas, columnas = matriz.shape
+
+    for i in range(filas):
+
+        for j in range(columnas):
+
+            if (i + j) > 2:
+
+                prob += matriz[i, j]
+
+    return prob
+
+
+def ambos_marcan(matriz):
+
+    prob = 0
+
+    filas, columnas = matriz.shape
+
+    for i in range(1, filas):
+
+        for j in range(1, columnas):
+
+            prob += matriz[i, j]
+
+    return prob
+
+
+# =====================================================
+# BOTÓN
+# =====================================================
+
+if st.button("Generar Predicción"):
+
+    if local == visitante:
+
+        st.warning(
+            "Selecciona equipos distintos."
+        )
+
+        st.stop()
+
+    eq_local = obtener_equipo(local)
+    eq_visitante = obtener_equipo(
+        visitante
+    )
+
+    lambda_local, lambda_visitante = (
+        expected_goals(
+            eq_local,
+            eq_visitante
+        )
+    )
+
+    matriz = generar_matriz(
+        lambda_local,
+        lambda_visitante
+    )
+
+    p_local, p_empate, p_visitante = (
+        probabilidades_1x2(matriz)
+    )
+
+    top3 = top3_scores(matriz)
+
+    st.subheader("Probabilidades")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric(
+        "Victoria Local",
+        f"{p_local*100:.1f}%"
+    )
+
+    c2.metric(
+        "Empate",
+        f"{p_empate*100:.1f}%"
+    )
+
+    c3.metric(
+        "Victoria Visitante",
+        f"{p_visitante*100:.1f}%"
+    )
+
+    st.divider()
+
+    st.subheader(
+        "🏆 Top 3 Marcadores"
+    )
+
+    for marcador, prob in top3:
+
+        st.write(
+            f"**{marcador}** → "
+            f"{prob*100:.2f}%"
+        )
+
+    st.divider()
+
+    st.subheader(
+        "Mercados Adicionales"
+    )
+
+    st.write(
+        f"Over 2.5: "
+        f"{over25(matriz)*100:.1f}%"
+    )
+
+    st.write(
+        f"Ambos marcan: "
+        f"{ambos_marcan(matriz)*100:.1f}%"
+    )
+
+    st.divider()
+
+    st.subheader(
+        "Goles Esperados"
+    )
+
+    st.write(
+        f"{local}: "
+        f"{lambda_local:.2f}"
+    )
+
+    st.write(
+        f"{visitante}: "
+        f"{lambda_visitante:.2f}"
     )
