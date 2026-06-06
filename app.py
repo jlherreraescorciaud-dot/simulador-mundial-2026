@@ -267,8 +267,19 @@ def confianza(top3):
 
     return "★☆☆☆☆"
 
-print(
-    "Confianza:",
+st.subheader(
+    "🏆 Top 3 Marcadores"
+)
+
+for marcador, prob in top3:
+
+    st.write(
+        f"**{marcador}** → "
+        f"{prob*100:.2f}%"
+    )
+
+st.metric(
+    "confianza",
     confianza(top3)
 )
 
