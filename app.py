@@ -368,11 +368,11 @@ if st.button("Generar Predicción"):
     st.divider()
 
     st.subheader(
-        "Marcadores Adicionales"
+        "Probabilidades Adicionales"
     )
 
     st.write(
-        f"Over 2.5: "
+        f"Más de 2.5: "
         f"{over25(matriz)*100:.1f}%"
     )
 
