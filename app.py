@@ -8,12 +8,12 @@ from scipy.stats import poisson
 # =====================================================
 
 st.set_page_config(
-    page_title="Mundial 2026 Predictor de José Luis y Jean",
+    page_title="Mundial 2026 Predictor de Jean y José Luis",
     page_icon="⚽",
     layout="wide"
 )
 
-st.title("⚽ Mundial 2026 - Predictor de Marcadores de José Luis y Jean")
+st.title("⚽ Mundial 2026 - Predictor de Marcadores de Jean y José Luis")
 
 # =====================================================
 # CARGA CSV
